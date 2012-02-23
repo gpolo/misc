@@ -4,25 +4,27 @@
 #
 # Usage:
 #
-# python google_history.py [username] [password] [earlier output] > output
+# python google_history.py [-u username] [-p password] [-i prev_output] > output
 #
 # Username and password must be entered if not specified in command line.
 # If a file containing an earlier output is given, this program will
 # grab your history up to the latest earlier history.
+#
 
 import sys
-from datetime import datetime
-from dateutil.parser import parse as date_parser
 from getpass import getpass
+from datetime import datetime
+from optparse import OptionParser
 
 try:
     import urllib2 as urllib
 except ImportError:
-    import urllib
+    from urllib import request as urllib
 try:
     from elementtree import ElementTree as ET
 except ImportError:
     from xml.etree import ElementTree as ET
+
 
 BASE_URL = 'https://www.google.com/history/lookup?'
 START_PAGE = BASE_URL + 'output=rss&num=%d'
@@ -71,12 +73,13 @@ def grab_history(username, passwd, datestop=None):
         date = _rss_dateindx(rss, -1)
         channel = rss.find('channel')
         items = channel.findall('item')
+        print datestop, date, date.tzinfo
         if datestop >= date:
             cut_at = _rbin_search(items, datestop)
             for item in items[cut_at:]:
                 channel.remove(item)
             nsaved_items += cut_at - 1
-            sys.stdout.write(ET.tostring(rss))
+            sys.stdout.write(ET.tostring(rss) + '\n')
             sys.stderr.write('Stopping\n')
             break
 
@@ -99,7 +102,7 @@ def grab_history(username, passwd, datestop=None):
 
 def _rss_dateindx(xmlrss, indx):
     raw_date = xmlrss.find('channel').findall('item')[indx].find('pubDate').text
-    return date_parser(raw_date)
+    return _date_parser(raw_date)
 
 def _rbin_search(rssitems, datestop):
     """'Reversed' binary search"""
@@ -107,7 +110,7 @@ def _rbin_search(rssitems, datestop):
     high = len(rssitems)
     while low < high:
         mid = (low + high) // 2
-        item = date_parser(rssitems[mid].find('pubDate').text)
+        item = _date_parser(rssitems[mid].find('pubDate').text)
         if datestop > item:
             high = mid
         elif datestop < item:
@@ -116,22 +119,35 @@ def _rbin_search(rssitems, datestop):
             return mid
     return -1
 
+def _date_parser(datestr):
+    """date_parser specific for the expected rss output."""
+    return datetime.strptime(datestr, '%a, %d %b %Y %H:%M:%S %Z')
+
 
 if __name__ == "__main__":
-    if len(sys.argv) == 1:
+    parser = OptionParser()
+    parser.add_option("-u", dest="username", help="Username",
+            metavar="USERNAME")
+    parser.add_option("-p", dest="password", help="Password",
+            metavar="PASSWORD")
+    parser.add_option("-i", dest="prev_output", help="Previous output",
+            metavar="FILE")
+
+    options, args = parser.parse_args()
+    if options.username is None:
         sys.stderr.write("Login: ")
         username = sys.stdin.readline()
     else:
-        username = sys.argv[1]
-    if len(sys.argv) < 3:
+        username = options.username
+    if options.password is None:
         try:
             passwd = getpass()
         except KeyboardInterrupt:
             raise SystemExit
     else:
-        passwd = sys.argv[2]
-    if len(sys.argv) == 4:
-        prev = open(sys.argv[3])
+        passwd = options.password
+    if options.prev_output is not None:
+        prev = open(options.prev_output)
         first_prev_date = _rss_dateindx(ET.fromstring(prev.readline()), 0)
         prev.close()
     else:
