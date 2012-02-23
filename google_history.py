@@ -12,20 +12,26 @@
 #
 
 import sys
+import codecs
 from getpass import getpass
 from datetime import datetime
 from optparse import OptionParser
 
 try:
     import urllib2 as urllib
+    def write_bytes(s):
+        sys.stdout.write(s.encode('utf8'))
 except ImportError:
     from urllib import request as urllib
+    def write_bytes(s):
+        sys.stdout.buffer.write(s.encode('utf8'))
 try:
     from elementtree import ElementTree as ET
 except ImportError:
     from xml.etree import ElementTree as ET
 
 
+ENCODING = 'ISO-8859-1'
 BASE_URL = 'https://www.google.com/history/lookup?'
 START_PAGE = BASE_URL + 'output=rss&num=%d'
 MOREH_PAGE = BASE_URL + 'month=%d&day=%d&yr=%d&output=rss&num=9999'
@@ -33,7 +39,7 @@ MOREH_PAGE = BASE_URL + 'month=%d&day=%d&yr=%d&output=rss&num=9999'
 def grab_history(username, passwd, datestop=None):
     if datestop is None:
         fetch_num = 9999
-        datestop = datetime.now()
+        datestop = datetime(year=1970, day=1, month=1)
     else:
         fetch_num = 1
 
@@ -73,18 +79,20 @@ def grab_history(username, passwd, datestop=None):
         date = _rss_dateindx(rss, -1)
         channel = rss.find('channel')
         items = channel.findall('item')
-        print datestop, date, date.tzinfo
         if datestop >= date:
             cut_at = _rbin_search(items, datestop)
+            if cut_at == -1: # XXX
+                break
+
             for item in items[cut_at:]:
                 channel.remove(item)
             nsaved_items += cut_at - 1
-            sys.stdout.write(ET.tostring(rss) + '\n')
+            write_bytes(ET.tostring(rss).decode(ENCODING) + '\n')
             sys.stderr.write('Stopping\n')
             break
 
         nsaved_items += len(items)
-        sys.stdout.write(data + '\n')
+        write_bytes(data.decode(ENCODING) + '\n')
 
         new_url = MOREH_PAGE % (date.month, date.day, date.year)
         sys.stderr.write('Reading feed starting at %d-%02d-%02d..' % (
@@ -136,6 +144,7 @@ if __name__ == "__main__":
     options, args = parser.parse_args()
     if options.username is None:
         sys.stderr.write("Login: ")
+        sys.stderr.flush()
         username = sys.stdin.readline()
     else:
         username = options.username
@@ -147,8 +156,9 @@ if __name__ == "__main__":
     else:
         passwd = options.password
     if options.prev_output is not None:
-        prev = open(options.prev_output)
-        first_prev_date = _rss_dateindx(ET.fromstring(prev.readline()), 0)
+        prev = codecs.open(options.prev_output, encoding=ENCODING)
+        first_prev_date = _rss_dateindx(
+                ET.fromstring(prev.readline().encode('utf8')), 0)
         prev.close()
     else:
         first_prev_date = None
