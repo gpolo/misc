@@ -34,8 +34,7 @@ def history_to_db(*history):
         title text, link text, date timestamp unique, category text,
         description text)""" % TABLENAME)
 
-    unique = 0
-    duplicates = 0
+    all_data = []
     for fname in history:
         with open(fname) as f:
             for line in f:
@@ -53,15 +52,15 @@ def history_to_db(*history):
                     category = item.find('category').text or ''
                     description = item.find('description').text or ''
                     data.append((title, link, date, category, description))
+                all_data.extend(data)
 
-                unique_items = set([i[1] for i in data])
-                duplicates += len(data) - len(unique_items)
-                unique += len(unique_items)
-                sys.stderr.write('Adding %d items\n' % len(unique_items))
-                conn.executemany("""INSERT OR IGNORE INTO %s(
-                        title, link, date, category,
-                        description) VALUES (?, ?, ?, ?, ?)""" % TABLENAME,
-                        data)
+                sys.stderr.write('%d items\n' % len(data))
+
+    unique_items = set([i[1] for i in all_data])
+    duplicates = len(all_data) - len(unique_items)
+    unique = len(unique_items)
+    conn.executemany("""INSERT OR IGNORE INTO %s(title, link, date, category,
+            description) VALUES (?, ?, ?, ?, ?)""" % TABLENAME, all_data)
 
     for line in conn.iterdump():
         write_bytes(line + '\n')
