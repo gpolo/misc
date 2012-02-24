@@ -145,7 +145,7 @@ if __name__ == "__main__":
     if options.username is None:
         sys.stderr.write("Login: ")
         sys.stderr.flush()
-        username = sys.stdin.readline()
+        username = sys.stdin.readline().rstrip()
     else:
         username = options.username
     if options.password is None:
