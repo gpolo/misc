@@ -5,7 +5,7 @@
 #
 # First run google_history.py
 # Then use this program as:
-# python google_history_db.py output1 [output2 ...] > out.db
+# python google_history_db.py output1 [output2 ...] out.db
 #
 
 import sys
@@ -27,10 +27,10 @@ else:
 
 TABLENAME = "googlehistory"
 
-def history_to_db(*history):
-    conn = sqlite3.connect(":memory:",
+def history_to_db(dbname, *history):
+    conn = sqlite3.connect(dbname,
             detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
-    conn.execute("""CREATE TABLE %s(
+    conn.execute("""CREATE TABLE IF NOT EXISTS %s(
         title text, link text, date timestamp unique, category text,
         description text)""" % TABLENAME)
 
@@ -54,16 +54,14 @@ def history_to_db(*history):
                     data.append((title, link, date, category, description))
                 all_data.extend(data)
 
-                sys.stderr.write('%d items\n' % len(data))
+                sys.stderr.write('Processed %d items\n' % len(data))
 
     unique_items = set([i[1] for i in all_data])
     duplicates = len(all_data) - len(unique_items)
     unique = len(unique_items)
     conn.executemany("""INSERT OR IGNORE INTO %s(title, link, date, category,
             description) VALUES (?, ?, ?, ?, ?)""" % TABLENAME, all_data)
-
-    for line in conn.iterdump():
-        write_bytes(line + '\n')
+    conn.commit()
 
     return unique, duplicates
 
@@ -74,5 +72,5 @@ def _date_parser(datestr):
 
 
 if __name__ == "__main__":
-    u, d = history_to_db(*sys.argv[1:])
+    u, d = history_to_db(sys.argv[-1], *sys.argv[1:-1])
     sys.stderr.write("Added %d items, discarded %d duplicates\n" % (u, d))
