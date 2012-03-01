@@ -165,4 +165,4 @@ if __name__ == "__main__":
 
     n = grab_history(username, passwd, first_prev_date)
     if n:
-        sys.stderr.write("Saved %d items\n" % n)
+        sys.stderr.write("Got %d items\n" % n)
