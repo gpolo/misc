@@ -31,7 +31,7 @@ def history_to_db(dbname, *history):
     conn = sqlite3.connect(dbname,
             detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
     conn.execute("""CREATE TABLE IF NOT EXISTS %s(
-        title text, link text, date timestamp unique, category text,
+        title text, link text, date timestamp primary key, category text,
         description text)""" % TABLENAME)
 
     all_data = []
@@ -41,7 +41,7 @@ def history_to_db(dbname, *history):
                 try:
                     rss = ET.fromstring(line)
                 except Exception as e:
-                    print("MISSED!", line)
+                    print("Error!", line)
                     raise SystemExit
                 items = rss.find('channel').findall('item')
                 data = []
@@ -56,11 +56,16 @@ def history_to_db(dbname, *history):
 
                 sys.stderr.write('Processed %d items\n' % len(data))
 
-    unique_items = set([i[1] for i in all_data])
+    unique_date = set()
+    date_indx = {}
+    for k, item in enumerate(all_data):
+        unique_date.add(item[2])
+        date_indx[item[2]] = k
+    unique_items = [all_data[k] for k in date_indx.itervalues()]
     duplicates = len(all_data) - len(unique_items)
     unique = len(unique_items)
     conn.executemany("""INSERT OR IGNORE INTO %s(title, link, date, category,
-            description) VALUES (?, ?, ?, ?, ?)""" % TABLENAME, all_data)
+            description) VALUES (?, ?, ?, ?, ?)""" % TABLENAME, unique_items)
     conn.commit()
 
     return unique, duplicates
@@ -73,4 +78,4 @@ def _date_parser(datestr):
 
 if __name__ == "__main__":
     u, d = history_to_db(sys.argv[-1], *sys.argv[1:-1])
-    sys.stderr.write("Added %d items, discarded %d duplicates\n" % (u, d))
+    sys.stderr.write("> %d unique items, discarded %d duplicates\n" % (u, d))
