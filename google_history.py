@@ -86,7 +86,7 @@ def grab_history(username, passwd, datestop=None):
 
             for item in items[cut_at:]:
                 channel.remove(item)
-            nsaved_items += cut_at - 1
+            nsaved_items += len(rss.find('channel').findall('item'))
             write_bytes(ET.tostring(rss).decode(ENCODING) + '\n')
             sys.stderr.write('Stopping\n')
             break
