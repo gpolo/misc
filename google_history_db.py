@@ -5,7 +5,7 @@
 #
 # First run google_history.py
 # Then use this program as:
-# python google_history_db.py output1 [output2 ...] out.db
+# python google_history_db.py output1 [output2 ...] hist.db
 #
 
 import sys
